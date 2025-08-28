@@ -1,0 +1,30 @@
+// Linear Congruential Generator (LCG) for random numbers
+
+class Random {
+    init(self, seed) {
+        self.state = seed;
+    }
+
+    // Returns a random integer in [0, 2^31-1]
+    next(self) {
+        self.state = (self.state * 1664525 + 1013904223) & 0x7FFFFFFF;
+        return self.state;
+    }
+
+    // Returns a random float in [0, 1)
+    next_float(self) {
+        return self.next() / 2147483648.0;
+    }
+
+    // Returns a random integer in [min, max]
+    next_range(self, min, max) {
+        return min + (self.next() % (max - min + 1));
+    }
+}
+
+// Example usage:
+let rng = Random($time_current_ms()); // Seed with current time
+
+$println("Random int: " + rng.next().to_s());
+$println("Random float: " + rng.next_float().to_s());
+$println("Random int in [10, 20]: " + rng.next_range(10, 20).to_s());

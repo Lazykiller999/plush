@@ -1,0 +1,264 @@
+// Draggable, movable window panels example
+
+let WINDOW_WIDTH = 1024;
+let WINDOW_HEIGHT = 768;
+
+// 32-bit color constants (AARRGGBB format)
+let WIN_BLUE = 0xFF3A6EA5;
+let PANEL_GRAY = 0xFFC0C0C0;
+let TITLE_BLUE = 0xFF000080;
+let WHITE = 0xFFFFFFFF;
+let BLACK = 0xFF000000;
+let RED = 0xFFEE0000;
+let DARK_GRAY = 0xFF808080;
+
+// Helper functions
+fun max(a, b) {
+    if (a > b) { return a; }
+    return b;
+}
+
+fun min(a, b) {
+    if (a < b) { return a; }
+    return b;
+}
+
+
+class Random {
+    init(self, seed) {
+        self.state = seed;
+    }
+
+    // Returns a random integer in [0, 2^31-1]
+    ran_int(self) {
+        self.state = (self.state * 1664525 + 1013904223) & 0x7FFFFFFF;
+        return self.state;
+    }
+
+    // Returns a random float in [0, 1)
+    ran_float(self) {
+        return self.ran_int() / 2147483648.0;
+    }
+
+    // Returns a random integer in [min, max]
+    ran_range(self, min, max) {
+        return min + (self.ran_int() % (max - min + 1));
+    }
+}
+
+// Helper function to draw a rectangle using fill_u32 for efficiency
+fun draw_rect(frame_buffer, x, y, width, height, color) {
+    let x_start = max(0, x);
+    let y_start = max(0, y);
+    let x_end = min(WINDOW_WIDTH, x + width);
+    let y_end = min(WINDOW_HEIGHT, y + height);
+
+    let clipped_width = x_end - x_start;
+
+    if (clipped_width <= 0) {
+        return;
+    }
+
+    for (let var j = y_start; j < y_end; ++j) {
+        let start_index = j * WINDOW_WIDTH + x_start;
+        frame_buffer.fill_u32(start_index, clipped_width, color);
+    }
+}
+
+// Helper function to draw an X
+fun draw_x(frame_buffer, x, y, size, color) {
+    for (let var i = 0; i < size; ++i) {
+        // Top-left to bottom-right diagonal
+        let px1 = x + i;
+        let py1 = y + i;
+        if (px1 >= 0 && px1 < WINDOW_WIDTH && py1 >= 0 && py1 < WINDOW_HEIGHT) {
+            frame_buffer.write_u32(py1 * WINDOW_WIDTH + px1, color);
+        }
+
+        // Top-right to bottom-left diagonal
+        let px2 = x + size - 1 - i;
+        let py2 = y + i;
+        if (px2 >= 0 && px2 < WINDOW_WIDTH && py2 >= 0 && py2 < WINDOW_HEIGHT) {
+            frame_buffer.write_u32(py2 * WINDOW_WIDTH + px2, color);
+        }
+    }
+}
+
+class Panel {
+    init(self, x, y, width, height, title) {
+        self.x = x;
+        self.y = y;
+        self.width = width;
+        self.height = height;
+        self.title = title;
+        self.is_open = true;
+        self.dragging = false;
+        self.drag_offset_x = 0;
+        self.drag_offset_y = 0;
+        self.velocity_y = 0;
+    }
+
+    // Draw the panel into a frame buffer
+    draw(self, frame_buffer) {
+        if (!self.is_open) {
+            return;
+        }
+
+        let title_bar_height = 20;
+        let close_button_size = 14;
+        let border = 3;
+
+        // Draw embossed border
+        draw_rect(frame_buffer, self.x, self.y, self.width, 1, WHITE);
+        draw_rect(frame_buffer, self.x, self.y, 1, self.height, WHITE);
+        draw_rect(frame_buffer, self.x + self.width - 1, self.y, 1, self.height, DARK_GRAY);
+        draw_rect(frame_buffer, self.x, self.y + self.height - 1, self.width, 1, DARK_GRAY);
+
+        // Draw the main panel background
+        draw_rect(frame_buffer, self.x + 1, self.y + 1, self.width - 2, self.height - 2, PANEL_GRAY);
+
+        // Draw the title bar
+        // draw_rect(frame_buffer, self.x + 1, self.y + 1, self.width - 2, title_bar_height, TITLE_BLUE);
+
+        // Draw the close button
+        // let close_button_x = self.x + self.width - close_button_size - border - 1;
+        // let close_button_y = self.y + border;
+        // draw_rect(frame_buffer, close_button_x, close_button_y, close_button_size, close_button_size, RED);
+
+        // Draw the X in the close button
+        //draw_x(frame_buffer, close_button_x + 3, close_button_y + 3, close_button_size - 6, WHITE);
+    }
+
+    // Handle mouse press events
+    on_mouse_down(self, x, y) {
+        if (!self.is_open) {
+            return false;
+        }
+
+        let title_bar_height = 20;
+        let close_button_size = 14;
+        let border = 3;
+        let close_button_x = self.x + self.width - close_button_size - border - 1;
+        let close_button_y = self.y + border;
+
+        if (x >= close_button_x && x < close_button_x + close_button_size &&
+            y >= close_button_y && y < close_button_y + close_button_size) {
+            self.is_open = false;
+            return true;
+        }
+
+        if (x >= self.x && x < self.x + self.width &&
+            y >= self.y && y < self.y + title_bar_height) {
+            self.dragging = true;
+            self.drag_offset_x = x - self.x;
+            self.drag_offset_y = y - self.y;
+            return true;
+        }
+
+        return false;
+    }
+
+    on_mouse_move(self, x, y) {
+        if (self.dragging) {
+            self.x = x - self.drag_offset_x;
+            self.y = y - self.drag_offset_y;
+            return true;
+        }
+        return false;
+    }
+
+    on_mouse_up(self) {
+        if (self.dragging) {
+            self.dragging = false;
+            return true;
+        }
+        return false;
+    }
+
+    
+
+}
+
+fun redraw(window_id, frame_buffer, panels) {
+    let start_time = $time_current_ms();
+
+    // Clear the buffer
+    frame_buffer.fill_u32(0, WINDOW_WIDTH * WINDOW_HEIGHT, WIN_BLUE);
+
+    // Draw all panels
+    for (let var i = 0; i < panels.len; ++i) {
+        panels[i].draw(frame_buffer);
+    }
+
+    let end_time = $time_current_ms();
+    $print("redraw time: ");
+    $print(end_time - start_time);
+    $print(" ms\n");
+
+    // Update the screen
+    $window_draw_frame(window_id, frame_buffer);
+}
+
+fun main() {
+    let window_id = $window_create(WINDOW_WIDTH, WINDOW_HEIGHT, "Jumping Jacks", 0);
+    let frame_buffer = ByteArray.with_size(WINDOW_WIDTH * WINDOW_HEIGHT * 4);
+    let var Player = [];
+    let var Platform = [];
+    let var Void = [];
+    let var start_time = 0;
+    let var end_time = 0;
+    let var platforms_completed = 0;
+
+    Player.push(Panel(500, 500, 75, 150, "Player"));
+
+
+
+    // Initial draw
+    redraw(window_id, frame_buffer, Player);
+
+    while (true) {
+        // Block and wait for an event
+        let event = $actor_recv();
+        let var rng = Random($time_current_ms()); // Seed with current time
+
+        if (event.kind == "CLOSE_WINDOW" || (event.kind == "KEY_DOWN" && event.key == "ESCAPE")) {
+            break;
+        }
+
+        if (event.kind == "KEY_DOWN" && event.key == "SPACE") {
+            // Move player up by 20px
+
+            start_time = $time_current_ms();
+        }
+        if (event.kind == "KEY_UP" && event.key == "SPACE") {
+            // Stop the jump
+            end_time = $time_current_ms();
+            let jump_duration = (end_time - start_time); // scale for longer, gentler jump
+            let jump_step = 1; // smaller jump per step
+            for (let var i = 0; i < Player.len; ++i) {
+                for (let var j = 0; j < jump_duration; ++j) {
+                    Player[i].y = Player[i].y - jump_step;
+                    if (Player[i].y < 0) {
+                        Player[i].y = 0;
+                        break;
+                    }
+                    redraw(window_id, frame_buffer, Player);
+                }
+            }
+        }
+        
+        if (Platform.len < 3) {
+            Platform.push(Panel(WINDOW_WIDTH - 100, rng.ran_range(400, 700), 100, 20, "Platform"));
+            redraw(window_id, frame_buffer, Platform);
+            // for (let var i = 0; i < Platform.len; ++i) {
+            //     Platform[i].x = Platform[i].x - rng.next_int(5, 20);
+            //     redraw(window_id, frame_buffer, Platform);
+            // }
+        }
+
+        // redraw(window_id, frame_buffer, Player);
+        
+    }
+}
+
+main();

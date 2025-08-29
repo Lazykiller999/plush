@@ -228,10 +228,17 @@ fun is_colliding(obj1, obj2) {
     let bottom2 = obj2.y + obj2.height;
 
     // Check for overlap
-    if (right1 < left2 || left1 > right2 || bottom1 < top2 || top1 > bottom2) {
+    if (right1 <= left2 || left1 >= right2 || bottom1 <= top2 || top1 >= bottom2) {
         return false;
     }
     return true;
+}
+
+fun can_spawn_platform(Platform) {
+    let min_gap = 150;
+    if (Platform.len == 0) return true;
+    let last = Platform[Platform.len - 1];
+    return last.x < (WINDOW_WIDTH - min_gap);
 }
 
 fun main() {
@@ -243,11 +250,16 @@ fun main() {
     let var start_time = 0;
     let var end_time = 0;
     let var platforms_completed = 0;
+    let var last_spawn_time = $time_current_ms();
+    let gravity = 1;
+    let spawn_interval = 300;
+    let var platform_speed = 5;
+    let var min_gap = 150;
 
     Player.push(Panel(500, 500, 75, 150, "Player"));
-    Platform.push(Panel(WINDOW_WIDTH - 100, 400, 100, 20, "Platform"));
-    Platform.push(Panel(WINDOW_WIDTH - 100, 500, 100, 20, "Platform"));
-    Platform.push(Panel(WINDOW_WIDTH - 100, 600, 100, 20, "Platform"));
+    // Platform.push(Panel(WINDOW_WIDTH - 100, 400, 100, 20, "Platform"));
+    // Platform.push(Panel(WINDOW_WIDTH - 100, 500, 100, 20, "Platform"));
+    // Platform.push(Panel(WINDOW_WIDTH - 100, 600, 100, 20, "Platform"));
 
 
 
@@ -258,6 +270,7 @@ fun main() {
         // Block and wait for an event
         let event = $actor_recv();
         let var rng = Random($time_current_ms()); // Seed with current time
+        let now = $time_current_ms();
 
         if (event.kind == "CLOSE_WINDOW" || (event.kind == "KEY_DOWN" && event.key == "ESCAPE")) {
             break;
@@ -267,6 +280,9 @@ fun main() {
             // Move player up by 20px
 
             start_time = $time_current_ms();
+            for (let var i = 0; i < Player.len; ++i) {
+            Player[i].velocity_y = -15; // Jump impulse
+        }
         }
         if (event.kind == "KEY_UP" && event.key == "SPACE") {
             // Stop the jump
@@ -295,16 +311,13 @@ fun main() {
                     }
                 }
             }
-            $println("Platform count: " + Platform.len.to_s());
         }
-
-    
-
-        if (Platform.len < 3) {
+        if (now - last_spawn_time >= spawn_interval && Platform.len < 3 && can_spawn_platform(Platform)) {
             Platform.push(Panel(WINDOW_WIDTH - 100, rng.ran_range(200, 700), 100, 20, "Platform"));
+            last_spawn_time = now;
             redraw(window_id, frame_buffer, Player, Platform, Void);
-            
         }
+
 
         // redraw(window_id, frame_buffer, Player, Platform, Void);
 

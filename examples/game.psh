@@ -23,6 +23,17 @@ fun min(a, b) {
     return b;
 }
 
+fun pop_at(arr, idx) {
+    if (idx < 0 || idx >= arr.len) {
+        return nil;
+    }
+    let val = arr[idx];
+    for (let var i = idx; i < arr.len - 1; ++i) {
+        arr[i] = arr[i + 1];
+    }
+    arr.pop();
+    return val;
+}
 
 class Random {
     init(self, seed) {
@@ -179,24 +190,48 @@ class Panel {
 
 }
 
-fun redraw(window_id, frame_buffer, panels) {
+fun redraw(window_id, frame_buffer, Player, Platform, Void) {
     let start_time = $time_current_ms();
 
     // Clear the buffer
     frame_buffer.fill_u32(0, WINDOW_WIDTH * WINDOW_HEIGHT, WIN_BLUE);
 
     // Draw all panels
-    for (let var i = 0; i < panels.len; ++i) {
-        panels[i].draw(frame_buffer);
+    for (let var i = 0; i < Player.len; ++i) {
+        Player[i].draw(frame_buffer);
+    }
+    for (let var i = 0; i < Platform.len; ++i) {
+        Platform[i].draw(frame_buffer);
+    }
+    for (let var i = 0; i < Void.len; ++i) {
+        Void[i].draw(frame_buffer);
     }
 
     let end_time = $time_current_ms();
-    $print("redraw time: ");
-    $print(end_time - start_time);
-    $print(" ms\n");
+    // $print("redraw time: ");
+    // $print(end_time - start_time);
+    // $print(" ms\n");
 
     // Update the screen
     $window_draw_frame(window_id, frame_buffer);
+}
+
+fun is_colliding(obj1, obj2) {
+    let left1 = obj1.x;
+    let right1 = obj1.x + obj1.width;
+    let top1 = obj1.y;
+    let bottom1 = obj1.y + obj1.height;
+
+    let left2 = obj2.x;
+    let right2 = obj2.x + obj2.width;
+    let top2 = obj2.y;
+    let bottom2 = obj2.y + obj2.height;
+
+    // Check for overlap
+    if (right1 < left2 || left1 > right2 || bottom1 < top2 || top1 > bottom2) {
+        return false;
+    }
+    return true;
 }
 
 fun main() {
@@ -210,11 +245,14 @@ fun main() {
     let var platforms_completed = 0;
 
     Player.push(Panel(500, 500, 75, 150, "Player"));
+    Platform.push(Panel(WINDOW_WIDTH - 100, 400, 100, 20, "Platform"));
+    Platform.push(Panel(WINDOW_WIDTH - 100, 500, 100, 20, "Platform"));
+    Platform.push(Panel(WINDOW_WIDTH - 100, 600, 100, 20, "Platform"));
 
 
 
     // Initial draw
-    redraw(window_id, frame_buffer, Player);
+    redraw(window_id, frame_buffer, Player, Platform, Void);
 
     while (true) {
         // Block and wait for an event
@@ -242,22 +280,34 @@ fun main() {
                         Player[i].y = 0;
                         break;
                     }
-                    redraw(window_id, frame_buffer, Player);
+                    redraw(window_id, frame_buffer, Player, Platform, Void);
                 }
             }
         }
-        
-        if (Platform.len < 3) {
-            Platform.push(Panel(WINDOW_WIDTH - 100, rng.ran_range(400, 700), 100, 20, "Platform"));
-            redraw(window_id, frame_buffer, Platform);
-            // for (let var i = 0; i < Platform.len; ++i) {
-            //     Platform[i].x = Platform[i].x - rng.next_int(5, 20);
-            //     redraw(window_id, frame_buffer, Platform);
-            // }
+        if (event.kind == "KEY_DOWN" && event.key == "A") {
+            for (let var i = 0; i < Platform.len; ++i) {
+                Platform[i].x = Platform[i].x - rng.ran_range(1, 10);
+                redraw(window_id, frame_buffer, Player, Platform, Void);
+
+                if (Platform[i].x < -100) {
+                    if (Platform.len > 0) {
+                       pop_at(Platform, i);
+                    }
+                }
+            }
+            $println("Platform count: " + Platform.len.to_s());
         }
 
-        // redraw(window_id, frame_buffer, Player);
-        
+    
+
+        if (Platform.len < 3) {
+            Platform.push(Panel(WINDOW_WIDTH - 100, rng.ran_range(200, 700), 100, 20, "Platform"));
+            redraw(window_id, frame_buffer, Player, Platform, Void);
+            
+        }
+
+        // redraw(window_id, frame_buffer, Player, Platform, Void);
+
     }
 }
 
